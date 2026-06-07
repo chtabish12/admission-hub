@@ -1,0 +1,102 @@
+// Prisma schema for AdmissionHub
+// SQLite is used for zero-config local dev. Lists are stored as JSON strings
+// (SQLite has no native array/enum support).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         String   @default("STUDENT") // STUDENT | CONSULTANT | ADMIN
+
+  // Student profile
+  fieldOfInterest  String?
+  preferredCountry String?
+  preferredCity    String?
+  educationLevel   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  stepProgress   StepProgress[]
+  savedUnis      SavedUniversity[]
+  consultant     Consultant?
+}
+
+model University {
+  id             String  @id @default(cuid())
+  name           String
+  country        String
+  city           String
+  ranking        Int?
+  description    String
+  fields         String  // JSON array of field names
+  tuitionMin     Int
+  tuitionMax     Int
+  currency       String  @default("USD")
+  acceptanceRate Int? // percentage
+  website        String?
+  imageUrl       String?
+  requirements   String  // JSON array
+  applicationSteps String // JSON array of { title, description }
+  deadlines      String?  // JSON array of { term, date }
+
+  saved SavedUniversity[]
+}
+
+model Consultant {
+  id          String  @id @default(cuid())
+  name        String
+  email       String?
+  company     String?
+  country     String
+  city        String
+  specialties String  // JSON array (e.g. countries / fields they cover)
+  fields      String  // JSON array
+  bio         String
+  rating      Float   @default(4.5)
+  reviews     Int     @default(0)
+  approved    Boolean @default(false)
+  source      String  @default("PLATFORM") // PLATFORM | GOOGLE
+  website     String?
+  phone       String?
+  imageUrl    String?
+
+  userId String? @unique
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+}
+
+model StepProgress {
+  id        String   @id @default(cuid())
+  userId    String
+  stepKey   String
+  completed Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, stepKey])
+}
+
+model SavedUniversity {
+  id           String   @id @default(cuid())
+  userId       String
+  universityId String
+  createdAt    DateTime @default(now())
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  university University @relation(fields: [universityId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, universityId])
+}
