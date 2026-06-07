@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Bookmark, Compass, Users, ArrowRight } from "lucide-react";
+import { Bookmark, Compass, Users, ArrowRight, BookOpenCheck } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Card, Button } from "@/components/ui";
@@ -39,7 +39,7 @@ export default async function DashboardPage() {
         </p>
       </div>
 
-      <div className="mb-8 grid gap-4 sm:grid-cols-3">
+      <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <QuickLink
           href="/universities"
           icon={Compass}
@@ -51,6 +51,12 @@ export default async function DashboardPage() {
           icon={Users}
           title="Find consultants"
           desc="Verified & nearby experts"
+        />
+        <QuickLink
+          href="/guides"
+          icon={BookOpenCheck}
+          title="Read guides"
+          desc="Visa & admission steps"
         />
         <QuickLink
           href="/become-consultant"

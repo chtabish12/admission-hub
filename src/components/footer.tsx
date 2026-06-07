@@ -17,6 +17,7 @@ export function Footer() {
           links={[
             { href: "/universities", label: "Find universities" },
             { href: "/consultants", label: "Find consultants" },
+            { href: "/guides", label: "Guides" },
             { href: "/how-it-works", label: "How it works" },
             { href: "/dashboard", label: "Dashboard" },
           ]}

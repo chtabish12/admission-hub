@@ -13,6 +13,7 @@ import type { SessionPayload } from "@/lib/auth";
 const links = [
   { href: "/universities", label: "Universities" },
   { href: "/consultants", label: "Consultants" },
+  { href: "/guides", label: "Guides" },
   { href: "/how-it-works", label: "How it works" },
 ];
 
