@@ -28,15 +28,20 @@ all in one place.
 | ----------- | ---------------------------------------------------- |
 | Framework   | Next.js 15 (App Router) + React 19 + TypeScript      |
 | Styling     | Tailwind CSS (CSS-variable theming, class dark mode) |
-| Database    | SQLite via Prisma ORM                                |
+| Database    | PostgreSQL via Prisma ORM (Neon / Vercel Postgres / Supabase) |
 | Auth        | Custom JWT sessions (`jose`) in httpOnly cookies + `bcryptjs` |
 | Icons       | lucide-react · Theme: next-themes                    |
 
 ## 🚀 Getting started
 
+This app uses **PostgreSQL**. Grab a free database from [Neon](https://neon.tech),
+Vercel Postgres, or Supabase and put its connection string in `.env` as `DATABASE_URL`.
+(You can use the same cloud database for local development and production.)
+
 ```bash
 npm install          # installs deps & generates the Prisma client
-npm run db:reset     # creates the SQLite DB and seeds demo data
+# set DATABASE_URL in .env first
+npm run db:reset     # creates the tables and seeds demo data
 npm run dev          # http://localhost:3000
 ```
 
@@ -57,12 +62,31 @@ Or create your own student account at `/signup`, or a consultant account at `/be
 Configured in `.env` (already created for local dev):
 
 ```env
-DATABASE_URL="file:./dev.db"
+DATABASE_URL="postgresql://user:password@host/dbname?sslmode=require"
 AUTH_SECRET="change-me-to-a-long-random-string"
 GOOGLE_PLACES_API_KEY=""   # optional — enables live "consultants near you"
 ```
 
 Without a Google key, the "consultants near you" feature returns realistic demo data so it still works.
+
+## ☁️ Deploy to Vercel
+
+1. Create a Postgres database (Vercel Postgres, [Neon](https://neon.tech), or Supabase) and copy its connection string.
+2. In your Vercel project → **Settings → Environment Variables**, add:
+   - `DATABASE_URL` — your Postgres connection string
+   - `AUTH_SECRET` — a long random string
+   - `GOOGLE_PLACES_API_KEY` — optional
+3. Deploy. The `build` script runs `prisma db push` automatically, so the tables are
+   created on first deploy.
+4. **Seed once** (creates demo users + initial data). From your machine, point at the
+   production database and run:
+   ```bash
+   DATABASE_URL="<your-prod-url>" npm run db:seed
+   ```
+   (Or just sign up via the UI and use the admin account to "Fetch latest universities".)
+
+> ⚠️ SQLite does **not** work on Vercel — the filesystem is read-only and ephemeral.
+> That's why this app uses PostgreSQL.
 
 ## 📜 Useful scripts
 

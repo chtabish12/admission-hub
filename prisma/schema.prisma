@@ -1,13 +1,13 @@
 // Prisma schema for AdmissionHub
-// SQLite is used for zero-config local dev. Lists are stored as JSON strings
-// (SQLite has no native array/enum support).
+// PostgreSQL — works locally and on serverless hosts like Vercel.
+// Lists are stored as JSON strings to keep the seed/query code portable.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
