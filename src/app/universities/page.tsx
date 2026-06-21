@@ -1,36 +1,38 @@
 import { Suspense } from "react";
-import { SearchX } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { UniversityCard } from "@/components/university-card";
 import { UniversityFilters } from "@/components/university-filters";
-import type { Prisma } from "@prisma/client";
+import { UniversityResults } from "@/components/university-results";
+import {
+  buildUniversityWhere,
+  PAGE_SIZE,
+  UNIVERSITY_ORDER,
+  type UniversitySearchParams,
+} from "@/lib/university-query";
 
 export const dynamic = "force-dynamic";
-
-type SearchParams = {
-  q?: string;
-  country?: string;
-  field?: string;
-  maxTuition?: string;
-};
 
 export default async function UniversitiesPage({
   searchParams,
 }: {
-  searchParams: Promise<SearchParams>;
+  searchParams: Promise<UniversitySearchParams>;
 }) {
   const sp = await searchParams;
+  const where = buildUniversityWhere(sp);
 
-  const where: Prisma.UniversityWhereInput = {};
-  if (sp.q) where.name = { contains: sp.q };
-  if (sp.country) where.country = sp.country;
-  if (sp.field) where.fields = { contains: sp.field };
-  if (sp.maxTuition) where.tuitionMin = { lte: Number(sp.maxTuition) };
+  const [universities, total] = await Promise.all([
+    prisma.university.findMany({
+      where,
+      orderBy: UNIVERSITY_ORDER,
+      take: PAGE_SIZE,
+    }),
+    prisma.university.count({ where }),
+  ]);
 
-  const universities = await prisma.university.findMany({
-    where,
-    orderBy: { ranking: "asc" },
-  });
+  // Filter params (without `page`) forwarded to the "Load more" API calls, and
+  // used as a remount key so results reset whenever the filters change.
+  const query = new URLSearchParams(
+    Object.entries(sp).filter(([, v]) => Boolean(v)) as [string, string][]
+  ).toString();
 
   return (
     <div className="container-page py-10">
@@ -45,25 +47,13 @@ export default async function UniversitiesPage({
         <UniversityFilters />
       </Suspense>
 
-      <p className="mb-4 mt-6 text-sm text-muted-foreground">
-        {universities.length} universit{universities.length === 1 ? "y" : "ies"} found
-      </p>
-
-      {universities.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border py-20 text-center">
-          <SearchX className="mb-3 h-10 w-10 text-muted-foreground" />
-          <p className="font-medium">No universities match your filters</p>
-          <p className="text-sm text-muted-foreground">
-            Try widening your search criteria.
-          </p>
-        </div>
-      ) : (
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {universities.map((u) => (
-            <UniversityCard key={u.id} uni={u} />
-          ))}
-        </div>
-      )}
+      <UniversityResults
+        key={query}
+        initial={universities}
+        total={total}
+        query={query}
+        course={sp.field}
+      />
     </div>
   );
 }

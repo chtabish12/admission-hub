@@ -6,7 +6,6 @@ import {
   Trophy,
   Globe,
   Wallet,
-  CheckCircle2,
   CalendarDays,
   ArrowLeft,
   Users,
@@ -15,6 +14,11 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { Card, Badge, Button } from "@/components/ui";
 import { SaveButton } from "@/components/save-button";
+import {
+  UniversityChecklist,
+  type ChecklistSection,
+} from "@/components/university-checklist";
+import { CourseSelector } from "@/components/course-selector";
 import { formatMoney, parseList } from "@/lib/utils";
 
 type Step = { title: string; description: string };
@@ -22,26 +26,68 @@ type Deadline = { term: string; date: string };
 
 export default async function UniversityDetail({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ course?: string }>;
 }) {
   const { id } = await params;
+  const { course: courseParam } = await searchParams;
   const uni = await prisma.university.findUnique({ where: { id } });
   if (!uni) notFound();
-
-  const session = await getSession();
-  let initialSaved = false;
-  if (session) {
-    const saved = await prisma.savedUniversity.findUnique({
-      where: { userId_universityId: { userId: session.userId, universityId: id } },
-    });
-    initialSaved = !!saved;
-  }
 
   const fields = parseList(uni.fields);
   const requirements = parseList(uni.requirements);
   const steps = parseList<Step>(uni.applicationSteps);
   const deadlines = parseList<Deadline>(uni.deadlines);
+
+  // The application guide is per-course: pick the requested course (from a
+  // filter/link) if the university offers it, otherwise the first one.
+  const selectedCourse =
+    courseParam && fields.includes(courseParam) ? courseParam : fields[0] ?? "";
+  // Progress keys are namespaced by university + course so each program tracks
+  // its own checklist independently.
+  const keyPrefix = `uni:${id}:course:${selectedCourse}:`;
+
+  const session = await getSession();
+  let initialSaved = false;
+  let completedSteps: string[] = [];
+  if (session) {
+    const [saved, progress] = await Promise.all([
+      prisma.savedUniversity.findUnique({
+        where: { userId_universityId: { userId: session.userId, universityId: id } },
+      }),
+      prisma.stepProgress.findMany({
+        where: {
+          userId: session.userId,
+          completed: true,
+          stepKey: { startsWith: keyPrefix },
+        },
+        select: { stepKey: true },
+      }),
+    ]);
+    initialSaved = !!saved;
+    completedSteps = progress.map((p) => p.stepKey);
+  }
+
+  // Build the per-course guide: requirements to prepare + application steps.
+  const checklistSections: ChecklistSection[] = [];
+  if (requirements.length > 0) {
+    checklistSections.push({
+      label: "Get ready — prepare these",
+      items: requirements.map((r, i) => ({ key: `${keyPrefix}req:${i}`, title: r })),
+    });
+  }
+  if (steps.length > 0) {
+    checklistSections.push({
+      label: "Apply — step by step",
+      items: steps.map((s, i) => ({
+        key: `${keyPrefix}step:${i}`,
+        title: s.title,
+        description: s.description,
+      })),
+    });
+  }
 
   return (
     <div>
@@ -108,43 +154,29 @@ export default async function UniversityDetail({
             </div>
           </section>
 
-          <section>
-            <h2 className="mb-3 text-xl font-semibold">Admission requirements</h2>
-            <Card className="divide-y divide-border">
-              {requirements.map((r) => (
-                <div key={r} className="flex items-start gap-3 p-4">
-                  <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-500" />
-                  <span className="text-sm">{r}</span>
+          {checklistSections.length > 0 && (
+            <section>
+              <h2 className="mb-1 text-xl font-semibold">
+                Your application guide
+              </h2>
+              <p className="mb-4 text-sm text-muted-foreground">
+                Pick your course, then tick off each requirement and step — your
+                progress for {selectedCourse || "this program"} at {uni.name} is
+                saved separately and automatically.
+              </p>
+              {fields.length > 0 && (
+                <div className="mb-4">
+                  <CourseSelector courses={fields} selected={selectedCourse} />
                 </div>
-              ))}
-            </Card>
-          </section>
-
-          <section>
-            <h2 className="mb-3 text-xl font-semibold">
-              Step-by-step application process
-            </h2>
-            <div className="space-y-4">
-              {steps.map((s, i) => (
-                <div key={i} className="flex gap-4">
-                  <div className="flex flex-col items-center">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary font-semibold text-primary-foreground">
-                      {i + 1}
-                    </div>
-                    {i < steps.length - 1 && (
-                      <div className="my-1 w-0.5 flex-1 bg-border" />
-                    )}
-                  </div>
-                  <Card className="mb-2 flex-1 p-4">
-                    <p className="font-semibold">{s.title}</p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {s.description}
-                    </p>
-                  </Card>
-                </div>
-              ))}
-            </div>
-          </section>
+              )}
+              <UniversityChecklist
+                key={selectedCourse}
+                sections={checklistSections}
+                initialCompleted={completedSteps}
+                isLoggedIn={!!session}
+              />
+            </section>
+          )}
         </div>
 
         {/* Sidebar */}

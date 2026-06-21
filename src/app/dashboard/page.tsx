@@ -7,6 +7,7 @@ import { Card, Button } from "@/components/ui";
 import { JourneyTracker } from "@/components/journey-tracker";
 import { ProfileForm } from "@/components/profile-form";
 import { UniversityCard } from "@/components/university-card";
+import { parseList } from "@/lib/utils";
 
 export default async function DashboardPage() {
   const session = await getSession();
@@ -27,6 +28,19 @@ export default async function DashboardPage() {
   if (!user) redirect("/login");
 
   const completedKeys = progress.map((p) => p.stepKey);
+
+  // Per-university guide progress, derived from the "uni:{id}:..." step keys.
+  const uniProgress = new Map<string, { done: number; total: number }>();
+  for (const s of saved) {
+    const u = s.university;
+    const total =
+      parseList(u.requirements).length + parseList(u.applicationSteps).length;
+    const done = Math.min(
+      completedKeys.filter((k) => k.startsWith(`uni:${u.id}:`)).length,
+      total
+    );
+    uniProgress.set(u.id, { done, total });
+  }
 
   return (
     <div className="container-page py-10">
@@ -97,23 +111,48 @@ export default async function DashboardPage() {
               </div>
             ) : (
               <div className="space-y-3">
-                {saved.map((s) => (
-                  <Link
-                    key={s.id}
-                    href={`/universities/${s.university.id}`}
-                    className="flex items-center justify-between rounded-lg border border-border p-3 transition-colors hover:bg-secondary"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">
-                        {s.university.name}
-                      </p>
-                      <p className="truncate text-xs text-muted-foreground">
-                        {s.university.city}, {s.university.country}
-                      </p>
-                    </div>
-                    <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  </Link>
-                ))}
+                {saved.map((s) => {
+                  const prog = uniProgress.get(s.university.id);
+                  const pct =
+                    prog && prog.total
+                      ? Math.round((prog.done / prog.total) * 100)
+                      : 0;
+                  return (
+                    <Link
+                      key={s.id}
+                      href={`/universities/${s.university.id}`}
+                      className="block rounded-lg border border-border p-3 transition-colors hover:bg-secondary"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium">
+                            {s.university.name}
+                          </p>
+                          <p className="truncate text-xs text-muted-foreground">
+                            {s.university.city}, {s.university.country}
+                          </p>
+                        </div>
+                        <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      </div>
+                      {prog && prog.total > 0 && (
+                        <div className="mt-2">
+                          <div className="mb-1 flex items-center justify-between text-[11px] text-muted-foreground">
+                            <span>Application guide</span>
+                            <span>
+                              {prog.done}/{prog.total}
+                            </span>
+                          </div>
+                          <div className="h-1.5 w-full overflow-hidden rounded-full bg-secondary">
+                            <div
+                              className="h-full rounded-full bg-gradient-to-r from-primary to-accent transition-all"
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </Link>
+                  );
+                })}
               </div>
             )}
           </Card>

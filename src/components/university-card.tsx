@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { MapPin, TrendingUp, GraduationCap } from "lucide-react";
+import { MapPin, TrendingUp } from "lucide-react";
 import { Card, Badge } from "@/components/ui";
+import { UniversityThumb } from "@/components/university-thumb";
 import { formatMoney, parseList } from "@/lib/utils";
 
 export type UniversityCardData = {
@@ -15,27 +16,26 @@ export type UniversityCardData = {
   tuitionMax: number;
   currency: string;
   acceptanceRate: number | null;
+  website: string | null;
   imageUrl: string | null;
 };
 
-export function UniversityCard({ uni }: { uni: UniversityCardData }) {
+export function UniversityCard({
+  uni,
+  course,
+}: {
+  uni: UniversityCardData;
+  course?: string;
+}) {
   const fields = parseList(uni.fields);
+  const href = course
+    ? `/universities/${uni.id}?course=${encodeURIComponent(course)}`
+    : `/universities/${uni.id}`;
   return (
-    <Link href={`/universities/${uni.id}`} className="group">
+    <Link href={href} className="group">
       <Card className="h-full overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg">
         <div className="relative h-40 w-full overflow-hidden bg-secondary">
-          {uni.imageUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={uni.imageUrl}
-              alt={uni.name}
-              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-            />
-          ) : (
-            <div className="flex h-full items-center justify-center">
-              <GraduationCap className="h-10 w-10 text-muted-foreground" />
-            </div>
-          )}
+          <UniversityThumb imageUrl={uni.imageUrl} name={uni.name} />
           {uni.ranking && (
             <Badge className="absolute left-3 top-3 bg-background/90 backdrop-blur">
               #{uni.ranking} World
