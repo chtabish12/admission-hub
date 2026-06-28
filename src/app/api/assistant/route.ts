@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import Anthropic from "@anthropic-ai/sdk";
+import { geminiConfigured, streamGeminiText } from "@/lib/gemini";
 
-// Allow a long-running streamed answer (web search runs server-side).
+// Allow a long-running streamed answer (search grounding can take a moment).
 export const maxDuration = 60;
 
 const schema = z.object({
@@ -26,25 +26,25 @@ const schema = z.object({
 function systemPrompt(context?: { country?: string; field?: string }) {
   const focus: string[] = [];
   if (context?.country) focus.push(`country: ${context.country}`);
-  if (context?.field) focus.push(`field of study: ${context.field}`);
+  if (context?.field) focus.push(`field/course: ${context.field}`);
   const focusLine = focus.length
     ? `\n\nThe user is currently browsing with these filters — ${focus.join(
         ", "
-      )}. Tailor your answer to that, and pull the latest figures for it.`
+      )}. Tailor your answer to that.`
     : "";
 
   return `You are the AdmissionHub assistant, helping students find universities and plan applications.
 You answer questions about universities, tuition fees, scholarships, admission requirements, deadlines, student visas and the application process.
 
-Use the web_search tool to fetch the latest, real information (current tuition fees, deadlines, rankings, visa rules) from official and reputable sources rather than guessing — figures change every year. Prefer official university and government sources.
+Use Google Search to ground answers in current, real information (current tuition fees, deadlines, rankings, visa rules) — figures change every year. Prefer official university and government sources.
 
-Be concise and practical. Use short paragraphs or bullet points. Always give figures with their currency and the academic year they apply to, and mention when a number is an estimate. If you used web sources, briefly note them.${focusLine}`;
+Be concise and practical. Use short paragraphs or bullet points. Always give figures with their currency and the academic year they apply to, and note when a number is an estimate.${focusLine}`;
 }
 
 export async function POST(req: Request) {
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!geminiConfigured()) {
     return NextResponse.json(
-      { error: "The assistant isn't configured yet. Add ANTHROPIC_API_KEY to your environment." },
+      { error: "The assistant isn't configured yet. Add GEMINI_API_KEY to your environment." },
       { status: 503 }
     );
   }
@@ -55,32 +55,11 @@ export async function POST(req: Request) {
   }
 
   const { messages, context } = parsed.data;
-  const client = new Anthropic();
-
-  const encoder = new TextEncoder();
-  const stream = new ReadableStream<Uint8Array>({
-    async start(controller) {
-      try {
-        const run = client.messages.stream({
-          model: "claude-opus-4-8",
-          max_tokens: 4000,
-          system: systemPrompt(context),
-          tools: [{ type: "web_search_20260209", name: "web_search" }],
-          messages: messages.map((m) => ({ role: m.role, content: m.content })),
-        });
-
-        run.on("text", (delta) => controller.enqueue(encoder.encode(delta)));
-        await run.finalMessage();
-      } catch (err) {
-        const message =
-          err instanceof Anthropic.APIError
-            ? `\n\n[Assistant error: ${err.message}]`
-            : "\n\n[The assistant hit an unexpected error. Please try again.]";
-        controller.enqueue(encoder.encode(message));
-      } finally {
-        controller.close();
-      }
-    },
+  const stream = streamGeminiText({
+    system: systemPrompt(context),
+    messages,
+    search: true,
+    maxOutputTokens: 2048,
   });
 
   return new Response(stream, {

@@ -50,7 +50,29 @@ model University {
   applicationSteps String // JSON array of { title, description }
   deadlines      String?  // JSON array of { term, date }
 
-  saved SavedUniversity[]
+  saved        SavedUniversity[]
+  courseGuides CourseGuide[]
+}
+
+// Per-course (program) admission data for a university: course-specific fees,
+// requirements, application steps and deadlines. Generated on demand and cached.
+model CourseGuide {
+  id               String  @id @default(cuid())
+  universityId     String
+  course           String
+  tuitionMin       Int
+  tuitionMax       Int
+  currency         String  @default("USD")
+  requirements     String  // JSON array of strings
+  applicationSteps String  // JSON array of { title, description }
+  deadlines        String? // JSON array of { term, date }
+  notes            String?
+  source           String  @default("AI")
+  createdAt        DateTime @default(now())
+
+  university University @relation(fields: [universityId], references: [id], onDelete: Cascade)
+
+  @@unique([universityId, course])
 }
 
 model Consultant {

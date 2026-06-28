@@ -19,7 +19,8 @@ import {
   type ChecklistSection,
 } from "@/components/university-checklist";
 import { CourseSelector } from "@/components/course-selector";
-import { formatMoney, parseList } from "@/lib/utils";
+import { GenerateCourseGuide } from "@/components/generate-course-guide";
+import { formatMoney, parseList, toExternalUrl } from "@/lib/utils";
 
 type Step = { title: string; description: string };
 type Deadline = { term: string; date: string };
@@ -37,14 +38,35 @@ export default async function UniversityDetail({
   if (!uni) notFound();
 
   const fields = parseList(uni.fields);
-  const requirements = parseList(uni.requirements);
-  const steps = parseList<Step>(uni.applicationSteps);
-  const deadlines = parseList<Deadline>(uni.deadlines);
+  const websiteUrl = toExternalUrl(uni.website);
 
   // The application guide is per-course: pick the requested course (from a
   // filter/link) if the university offers it, otherwise the first one.
   const selectedCourse =
     courseParam && fields.includes(courseParam) ? courseParam : fields[0] ?? "";
+
+  // Course-specific data (fees, requirements, steps) is generated & cached by
+  // the course-guide API. Until that exists we fall back to the university's
+  // generic data.
+  const guide = selectedCourse
+    ? await prisma.courseGuide.findUnique({
+        where: { universityId_course: { universityId: id, course: selectedCourse } },
+      })
+    : null;
+
+  const requirements = guide
+    ? parseList(guide.requirements)
+    : parseList(uni.requirements);
+  const steps = guide
+    ? parseList<Step>(guide.applicationSteps)
+    : parseList<Step>(uni.applicationSteps);
+  const deadlines = guide?.deadlines
+    ? parseList<Deadline>(guide.deadlines)
+    : parseList<Deadline>(uni.deadlines);
+  const tuitionMin = guide?.tuitionMin ?? uni.tuitionMin;
+  const tuitionMax = guide?.tuitionMax ?? uni.tuitionMax;
+  const currency = guide?.currency ?? uni.currency;
+
   // Progress keys are namespaced by university + course so each program tracks
   // its own checklist independently.
   const keyPrefix = `uni:${id}:course:${selectedCourse}:`;
@@ -128,8 +150,8 @@ export default async function UniversityDetail({
               initialSaved={initialSaved}
               isLoggedIn={!!session}
             />
-            {uni.website && (
-              <a href={uni.website} target="_blank" rel="noopener noreferrer">
+            {websiteUrl && (
+              <a href={websiteUrl} target="_blank" rel="noopener noreferrer">
                 <Button variant="outline">
                   <Globe className="h-4 w-4" /> Official website
                 </Button>
@@ -165,8 +187,16 @@ export default async function UniversityDetail({
                 saved separately and automatically.
               </p>
               {fields.length > 0 && (
-                <div className="mb-4">
+                <div className="mb-4 space-y-3">
                   <CourseSelector courses={fields} selected={selectedCourse} />
+                  {selectedCourse && (
+                    <GenerateCourseGuide
+                      universityId={uni.id}
+                      course={selectedCourse}
+                      hasGuide={!!guide}
+                      notes={guide?.notes}
+                    />
+                  )}
                 </div>
               )}
               <UniversityChecklist
@@ -186,10 +216,12 @@ export default async function UniversityDetail({
             <div className="space-y-4">
               <Fact
                 icon={Wallet}
-                label="Tuition (per year)"
-                value={`${formatMoney(uni.tuitionMin, uni.currency)} – ${formatMoney(
-                  uni.tuitionMax,
-                  uni.currency
+                label={
+                  guide ? `Tuition — ${selectedCourse} (per year)` : "Tuition (per year)"
+                }
+                value={`${formatMoney(tuitionMin, currency)} – ${formatMoney(
+                  tuitionMax,
+                  currency
                 )}`}
               />
               {uni.ranking && (

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { FIELDS } from "@/lib/constants";
+import { toExternalUrl } from "@/lib/utils";
 
 /**
  * Auto-fetch real universities from the public Hipolabs API
@@ -143,7 +144,7 @@ export async function fetchUniversitiesForCountry(
           tuitionMax: fees.max,
           currency: fees.currency,
           acceptanceRate: null,
-          website: u.web_pages?.[0] ?? null,
+          website: toExternalUrl(u.web_pages?.[0]),
           imageUrl: null,
           requirements: JSON.stringify(DEFAULT_REQUIREMENTS),
           applicationSteps: JSON.stringify(DEFAULT_STEPS),

@@ -35,7 +35,12 @@ export function UniversityCard({
     <Link href={href} className="group">
       <Card className="h-full overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg">
         <div className="relative h-40 w-full overflow-hidden bg-secondary">
-          <UniversityThumb imageUrl={uni.imageUrl} name={uni.name} />
+          <UniversityThumb
+            imageUrl={uni.imageUrl}
+            name={uni.name}
+            universityId={uni.id}
+            website={uni.website}
+          />
           {uni.ranking && (
             <Badge className="absolute left-3 top-3 bg-background/90 backdrop-blur">
               #{uni.ranking} World

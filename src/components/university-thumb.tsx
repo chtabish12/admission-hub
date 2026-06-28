@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 /** First letters of up to two words, e.g. "Stanford University" -> "SU". */
 function initials(name: string): string {
@@ -17,20 +17,45 @@ function hueFromName(name: string): number {
   return h;
 }
 
+type Img = { url: string; kind: "image" | "icon" };
+
 /**
- * Always renders a thumbnail: a coloured gradient with the university's
- * initials (never "missing"), and a real photo layered on top if `imageUrl`
- * is present and loads successfully.
+ * Always renders a thumbnail: a coloured gradient with initials as the base,
+ * with a real photo/logo layered on top. If no `imageUrl` is supplied it lazily
+ * fetches one from the image API (og:image → favicon), cached server-side.
  */
 export function UniversityThumb({
   imageUrl,
   name,
+  universityId,
+  website,
 }: {
   imageUrl: string | null;
   name: string;
+  universityId?: string;
+  website?: string | null;
 }) {
-  const [imgOk, setImgOk] = useState(true);
+  const [img, setImg] = useState<Img | null>(
+    imageUrl ? { url: imageUrl, kind: "image" } : null
+  );
+  const [failed, setFailed] = useState(false);
   const h = hueFromName(name);
+
+  useEffect(() => {
+    let active = true;
+    if (img || !universityId || !website) return;
+    fetch(`/api/universities/${universityId}/image`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (active && data?.imageUrl) {
+          setImg({ url: data.imageUrl, kind: data.kind ?? "image" });
+        }
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [img, universityId, website]);
 
   return (
     <div
@@ -45,13 +70,17 @@ export function UniversityThumb({
         </span>
       </div>
 
-      {imageUrl && imgOk && (
+      {img && !failed && (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={imageUrl}
+          src={img.url}
           alt={name}
-          onError={() => setImgOk(false)}
-          className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+          onError={() => setFailed(true)}
+          className={
+            img.kind === "icon"
+              ? "absolute inset-0 h-full w-full bg-white object-contain p-6"
+              : "absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+          }
         />
       )}
     </div>
