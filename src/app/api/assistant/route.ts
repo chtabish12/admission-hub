@@ -58,7 +58,9 @@ export async function POST(req: Request) {
   const stream = streamGeminiText({
     system: systemPrompt(context),
     messages,
-    search: true,
+    // Google Search grounding has a much smaller free quota than plain text;
+    // set GEMINI_SEARCH=false to disable it if you hit 429s.
+    search: process.env.GEMINI_SEARCH !== "false",
     maxOutputTokens: 2048,
   });
 
