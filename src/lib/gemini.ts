@@ -20,9 +20,14 @@ function toContents(messages: ChatMsg[]) {
   }));
 }
 
+const FALLBACK_MODEL = "gemini-2.0-flash-lite";
+
 /**
  * Streams a chat answer as plain-text chunks. `search: true` enables Google
  * Search grounding so answers can use current information.
+ *
+ * Free-tier quotas differ per feature/model (search grounding is the
+ * smallest), so on 429 we retry: with search → without search → lighter model.
  */
 export function streamGeminiText(opts: {
   system: string;
@@ -31,30 +36,51 @@ export function streamGeminiText(opts: {
   maxOutputTokens?: number;
 }): ReadableStream<Uint8Array> {
   const key = process.env.GEMINI_API_KEY!;
-  const body = {
-    system_instruction: { parts: [{ text: opts.system }] },
-    contents: toContents(opts.messages),
-    ...(opts.search ? { tools: [{ google_search: {} }] } : {}),
-    generationConfig: { maxOutputTokens: opts.maxOutputTokens ?? 2048 },
-  };
+
+  function makeBody(search: boolean) {
+    return JSON.stringify({
+      system_instruction: { parts: [{ text: opts.system }] },
+      contents: toContents(opts.messages),
+      ...(search ? { tools: [{ google_search: {} }] } : {}),
+      generationConfig: { maxOutputTokens: opts.maxOutputTokens ?? 2048 },
+    });
+  }
+
+  const attempts: { model: string; search: boolean }[] = [
+    ...(opts.search ? [{ model: MODEL, search: true }] : []),
+    { model: MODEL, search: false },
+    ...(MODEL !== FALLBACK_MODEL ? [{ model: FALLBACK_MODEL, search: false }] : []),
+  ];
 
   const encoder = new TextEncoder();
   return new ReadableStream<Uint8Array>({
     async start(controller) {
       try {
-        const res = await fetch(
-          `${BASE}/${MODEL}:streamGenerateContent?alt=sse&key=${key}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body),
+        let res: Response | null = null;
+        let lastError = "";
+        for (const attempt of attempts) {
+          const r = await fetch(
+            `${BASE}/${attempt.model}:streamGenerateContent?alt=sse&key=${key}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: makeBody(attempt.search),
+            }
+          );
+          if (r.ok && r.body) {
+            res = r;
+            break;
           }
-        );
-        if (!res.ok || !res.body) {
-          const detail = await res.text().catch(() => "");
+          lastError = `${r.status} ${(await r.text().catch(() => "")).slice(0, 200)}`;
+          if (r.status !== 429 && r.status !== 503) break;
+        }
+
+        if (!res || !res.body) {
           controller.enqueue(
             encoder.encode(
-              `\n\n[Assistant error: ${res.status} ${detail.slice(0, 200)}]`
+              lastError.startsWith("429")
+                ? "\n\nI'm receiving a lot of requests right now (free-tier quota reached). Please wait a minute and try again."
+                : `\n\n[Assistant error: ${lastError}]`
             )
           );
           controller.close();
@@ -120,13 +146,27 @@ export async function generateGeminiJSON(opts: {
     },
   };
 
-  const res = await fetch(`${BASE}/${MODEL}:generateContent?key=${key}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    throw new Error(`Gemini ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  let res: Response | null = null;
+  let lastError = "";
+  for (const model of [MODEL, ...(MODEL !== FALLBACK_MODEL ? [FALLBACK_MODEL] : [])]) {
+    const r = await fetch(`${BASE}/${model}:generateContent?key=${key}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (r.ok) {
+      res = r;
+      break;
+    }
+    lastError = `Gemini ${r.status}: ${(await r.text()).slice(0, 300)}`;
+    if (r.status !== 429 && r.status !== 503) break;
+  }
+  if (!res) {
+    throw new Error(
+      lastError.includes("429")
+        ? "The free AI quota is temporarily exhausted — please try again in a minute."
+        : lastError
+    );
   }
   const data = await res.json();
   const text: string =
