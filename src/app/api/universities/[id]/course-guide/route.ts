@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { toExternalUrl } from "@/lib/utils";
-import { geminiConfigured, generateGeminiJSON } from "@/lib/gemini";
+import { aiConfigured, generateAIJSON } from "@/lib/ai";
 
 export const maxDuration = 60;
 
@@ -103,9 +103,9 @@ export async function POST(
     return NextResponse.json({ ok: true, cached: true, guide: serialize(cached) });
   }
 
-  if (!geminiConfigured()) {
+  if (!aiConfigured()) {
     return NextResponse.json(
-      { error: "Course guides need GEMINI_API_KEY to be configured." },
+      { error: "Course guides need GROQ_API_KEY or GEMINI_API_KEY to be configured." },
       { status: 503 }
     );
   }
@@ -128,7 +128,7 @@ Official website: ${websiteUrl ?? "unknown"}`;
 
   let raw: unknown;
   try {
-    raw = await generateGeminiJSON({ system, prompt, responseSchema, maxOutputTokens: 2048 });
+    raw = await generateAIJSON({ system, prompt, responseSchema, maxOutputTokens: 2048 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "AI request failed";
     return NextResponse.json({ error: message }, { status: 502 });

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { geminiConfigured, streamGeminiText } from "@/lib/gemini";
+import { aiConfigured, streamAIText } from "@/lib/ai";
 
 // Allow a long-running streamed answer (search grounding can take a moment).
 export const maxDuration = 60;
@@ -42,9 +42,9 @@ Be concise and practical. Use short paragraphs or bullet points. Always give fig
 }
 
 export async function POST(req: Request) {
-  if (!geminiConfigured()) {
+  if (!aiConfigured()) {
     return NextResponse.json(
-      { error: "The assistant isn't configured yet. Add GEMINI_API_KEY to your environment." },
+      { error: "The assistant isn't configured yet. Add GROQ_API_KEY or GEMINI_API_KEY to your environment (both free)." },
       { status: 503 }
     );
   }
@@ -55,11 +55,9 @@ export async function POST(req: Request) {
   }
 
   const { messages, context } = parsed.data;
-  const stream = streamGeminiText({
+  const stream = streamAIText({
     system: systemPrompt(context),
     messages,
-    // Google Search grounding has a much smaller free quota than plain text;
-    // set GEMINI_SEARCH=false to disable it if you hit 429s.
     search: process.env.GEMINI_SEARCH !== "false",
     maxOutputTokens: 2048,
   });
