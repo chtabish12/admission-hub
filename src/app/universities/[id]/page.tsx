@@ -145,6 +145,17 @@ export default async function UniversityDetail({
         {/* Main */}
         <div className="space-y-8 lg:col-span-2">
           <div className="flex flex-wrap items-center gap-3">
+            {(!session || session.role === "STUDENT") && (
+              <Link
+                href={
+                  selectedCourse
+                    ? `/universities/${uni.id}/apply?course=${encodeURIComponent(selectedCourse)}`
+                    : `/universities/${uni.id}/apply`
+                }
+              >
+                <Button>Apply now</Button>
+              </Link>
+            )}
             <SaveButton
               universityId={uni.id}
               initialSaved={initialSaved}

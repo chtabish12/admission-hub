@@ -7,8 +7,10 @@ const schema = z.object({
   name: z.string().min(2, "Name is too short"),
   email: z.string().email("Invalid email"),
   password: z.string().min(6, "Password must be at least 6 characters"),
+  role: z.enum(["STUDENT", "UNIVERSITY"]).default("STUDENT"),
   fieldOfInterest: z.string().optional(),
   preferredCountry: z.string().optional(),
+  universityId: z.string().optional(),
 });
 
 export async function POST(req: Request) {
@@ -21,8 +23,24 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
-    const { name, email, password, fieldOfInterest, preferredCountry } =
+    const { name, email, password, role, fieldOfInterest, preferredCountry, universityId } =
       parsed.data;
+
+    if (role === "UNIVERSITY") {
+      if (!universityId) {
+        return NextResponse.json(
+          { error: "Select your university" },
+          { status: 400 }
+        );
+      }
+      const uni = await prisma.university.findUnique({ where: { id: universityId } });
+      if (!uni) {
+        return NextResponse.json(
+          { error: "University not found" },
+          { status: 400 }
+        );
+      }
+    }
 
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
@@ -38,8 +56,10 @@ export async function POST(req: Request) {
         name,
         email,
         passwordHash,
-        fieldOfInterest: fieldOfInterest || null,
-        preferredCountry: preferredCountry || null,
+        role,
+        fieldOfInterest: role === "STUDENT" ? fieldOfInterest || null : null,
+        preferredCountry: role === "STUDENT" ? preferredCountry || null : null,
+        universityId: role === "UNIVERSITY" ? universityId : null,
       },
     });
 
@@ -50,7 +70,7 @@ export async function POST(req: Request) {
       role: user.role,
     });
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, role: user.role });
   } catch (err) {
     console.error(err);
     return NextResponse.json({ error: "Something went wrong" }, { status: 500 });

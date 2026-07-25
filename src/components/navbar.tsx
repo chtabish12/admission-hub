@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
-import { Menu, X, LogOut, LayoutDashboard, ShieldCheck } from "lucide-react";
+import { Menu, X, LogOut, LayoutDashboard, ShieldCheck, FileText, Building2 } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui";
@@ -64,12 +64,29 @@ export function Navbar({ session }: { session: SessionPayload | null }) {
                   </Button>
                 </Link>
               )}
-              <Link href="/dashboard">
-                <Button variant="outline" size="sm">
-                  <LayoutDashboard className="h-4 w-4" />
-                  Dashboard
-                </Button>
-              </Link>
+              {session.role === "STUDENT" && (
+                <Link href="/portal/applications">
+                  <Button variant="ghost" size="sm">
+                    <FileText className="h-4 w-4" />
+                    Applications
+                  </Button>
+                </Link>
+              )}
+              {session.role === "UNIVERSITY" ? (
+                <Link href="/portal">
+                  <Button variant="outline" size="sm">
+                    <Building2 className="h-4 w-4" />
+                    Admissions
+                  </Button>
+                </Link>
+              ) : (
+                <Link href="/portal">
+                  <Button variant="outline" size="sm">
+                    <LayoutDashboard className="h-4 w-4" />
+                    Portal
+                  </Button>
+                </Link>
+              )}
               <Button variant="ghost" size="sm" onClick={logout}>
                 <LogOut className="h-4 w-4" />
               </Button>
@@ -124,9 +141,16 @@ export function Navbar({ session }: { session: SessionPayload | null }) {
                       </Button>
                     </Link>
                   )}
-                  <Link href="/dashboard" onClick={() => setOpen(false)}>
+                  {session.role === "STUDENT" && (
+                    <Link href="/portal/applications" onClick={() => setOpen(false)}>
+                      <Button variant="ghost" className="w-full">
+                        My applications
+                      </Button>
+                    </Link>
+                  )}
+                  <Link href="/portal" onClick={() => setOpen(false)}>
                     <Button variant="outline" className="w-full">
-                      Dashboard
+                      {session.role === "UNIVERSITY" ? "Admissions" : "Portal"}
                     </Button>
                   </Link>
                   <Button variant="ghost" onClick={logout} className="w-full">

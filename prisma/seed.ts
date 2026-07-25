@@ -121,11 +121,23 @@ async function main() {
     },
   });
 
-  // Universities are no longer seeded with static data — they are populated
-  // on demand from live online sources via the "Fetch latest data" search.
-  // Clear any previously seeded rows so only live-fetched data remains.
-  await prisma.university.deleteMany();
-  console.log("✓ Cleared static universities (now fetched live)");
+
+  const demoUni = await prisma.university.findFirst();
+  if (demoUni) {
+    const uniPass = await bcrypt.hash("uni123", 10);
+    await prisma.user.upsert({
+      where: { email: "university@demo.com" },
+      update: { role: "UNIVERSITY", universityId: demoUni.id },
+      create: {
+        name: "Admissions Office",
+        email: "university@demo.com",
+        passwordHash: uniPass,
+        role: "UNIVERSITY",
+        universityId: demoUni.id,
+      },
+    });
+    console.log(`✓ University login: university@demo.com / uni123 (${demoUni.name})`);
+  }
 
   await prisma.consultant.deleteMany({ where: { source: "PLATFORM" } });
   for (const c of consultants) {

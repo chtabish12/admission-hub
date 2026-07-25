@@ -12,6 +12,7 @@ import { parseList } from "@/lib/utils";
 export default async function DashboardPage() {
   const session = await getSession();
   if (!session) redirect("/login");
+  if (session.role === "UNIVERSITY") redirect("/portal");
 
   const [user, progress, saved] = await Promise.all([
     prisma.user.findUnique({ where: { id: session.userId } }),

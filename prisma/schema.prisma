@@ -16,13 +16,22 @@ model User {
   name         String
   email        String   @unique
   passwordHash String
-  role         String   @default("STUDENT") // STUDENT | CONSULTANT | ADMIN
+  role         String   @default("STUDENT") // STUDENT | CONSULTANT | ADMIN | UNIVERSITY
 
-  // Student profile
   fieldOfInterest  String?
   preferredCountry String?
   preferredCity    String?
   educationLevel   String?
+  cgpa             Float?
+  budget           Int?
+  ieltsScore       Float?
+  toeflScore       Int?
+  workExperience   Int?
+  careerGoals      String?
+  preferredIntake  String?
+
+  universityId String?
+  university   University? @relation("UniversityStaff", fields: [universityId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -30,6 +39,35 @@ model User {
   stepProgress   StepProgress[]
   savedUnis      SavedUniversity[]
   consultant     Consultant?
+  applications   Application[]
+  documents      Document[]
+  sentMessages   Message[]
+}
+
+model Document {
+  id         String   @id @default(cuid())
+  userId     String
+  name       String
+  type       String
+  url        String
+  status     String   @default("pending")
+  version    Int      @default(1)
+  expiryDate String?
+  uploadedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Message {
+  id            String   @id @default(cuid())
+  applicationId String
+  senderId      String
+  content       String
+  read          Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  sender      User        @relation(fields: [senderId], references: [id], onDelete: Cascade)
 }
 
 model University {
@@ -52,6 +90,66 @@ model University {
 
   saved        SavedUniversity[]
   courseGuides CourseGuide[]
+  staff        User[]        @relation("UniversityStaff")
+  applications Application[]
+}
+
+model Application {
+  id           String @id @default(cuid())
+  studentId    String
+  universityId String
+  course       String
+  status       String @default("new")
+  priority     String @default("medium")
+  intake       String?
+
+  fullName      String
+  email         String
+  phone         String?
+  nationality   String?
+  educationLevel String?
+  gpa           String?
+  englishTest   String?
+  statement     String
+  documents     String  @default("[]")
+  universityNotes String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  student    User       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  university University @relation(fields: [universityId], references: [id], onDelete: Cascade)
+  events     ApplicationEvent[]
+  messages   Message[]
+  requirements ApplicationRequirement[]
+
+  @@unique([studentId, universityId, course])
+}
+
+model ApplicationRequirement {
+  id            String   @id @default(cuid())
+  applicationId String
+  title         String
+  status        String   @default("pending")
+  documentName  String?
+  documentUrl   String?
+  note          String?
+  createdBy     String   @default("SYSTEM")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+}
+
+model ApplicationEvent {
+  id            String   @id @default(cuid())
+  applicationId String
+  type          String
+  message       String
+  actor         String
+  createdAt     DateTime @default(now())
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
 }
 
 // Per-course (program) admission data for a university: course-specific fees,
